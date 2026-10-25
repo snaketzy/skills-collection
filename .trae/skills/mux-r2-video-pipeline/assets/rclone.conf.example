@@ -1,0 +1,17 @@
+# rclone 配置样例（复制为项目根的 rclone.conf）
+#
+# 关键点：
+#   provider = Other        不要用 Cloudflare，否则 rclone 会尝试自动建桶导致 403
+#   no_check_bucket = true  跳过建桶前的检查
+#   endpoint 使用 S3 兼容端点 https://<ACCOUNT_ID>.r2.cloudflarestorage.com
+#
+# access_key_id / secret_access_key 与 cloudflare.env 中对应字段保持一致。
+
+[r2]
+type = s3
+provider = Other
+access_key_id = <R2 Access Key ID>
+secret_access_key = <R2 Secret Access Key>
+endpoint = https://<CLOUDFLARE_ACCOUNT_ID>.r2.cloudflarestorage.com
+acl = private
+no_check_bucket = true
