@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HLS 冒烟测试播放器</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #0b0b0d; color: #eaeaea; font: 14px -apple-system, "PingFang SC", sans-serif; }
+  .wrap { max-width: 1000px; margin: 24px auto; padding: 0 16px; }
+  video { width: 100%; background: #000; border-radius: 10px; }
+  h1 { font-size: 16px; font-weight: 600; margin: 0 0 12px; }
+  .bar { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 14px; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  label { font-size: 12px; color: #9a9a9a; }
+  select { background: #1a1a1e; color: #eaeaea; border: 1px solid #333; border-radius: 8px; padding: 8px 10px; min-width: 220px; }
+  .stat { margin-top: 12px; font-size: 12px; color: #8a8a8a; font-variant-numeric: tabular-nums; }
+  .err { color: #ff6b6b; margin-top: 10px; white-space: pre-wrap; font-family: ui-monospace, monospace; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>HLS 冒烟测试 · 多码率 / 多音轨 / 多字幕</h1>
+  <video id="v" controls autoplay muted playsinline></video>
+  <div class="bar">
+    <div class="field">
+      <label>画质 (Level)</label>
+      <select id="level"><option value="-1">Auto</option></select>
+    </div>
+    <div class="field">
+      <label>音轨 (Audio)</label>
+      <select id="audio"></select>
+    </div>
+    <div class="field">
+      <label>字幕 (Subtitle)</label>
+      <select id="subs"></select>
+    </div>
+  </div>
+  <div class="stat" id="stat">加载中…</div>
+  <div class="err" id="err"></div>
+</div>
+
+<script src="./hls.min.js"></script>
+<script>
+const SRC = 'master.m3u8';
+const v = document.getElementById('v');
+const levelSel = document.getElementById('level');
+const audioSel = document.getElementById('audio');
+const subsSel = document.getElementById('subs');
+const stat = document.getElementById('stat');
+const err = document.getElementById('err');
+
+const fmt = n => (n / 1000000).toFixed(2) + ' Mbps';
+const log = m => { stat.textContent = m; };
+const fail = m => { err.textContent += m + '\n'; };
+
+// ---- 直接从 master.m3u8 解析轨道（不依赖 hls.js） ----
+function parseAttr(line) {
+  const o = {};
+  const re = /([A-Z0-9-]+)=("[^"]*"|[^,]*)/g;
+  let m;
+  while ((m = re.exec(line))) o[m[1]] = m[2].replace(/^"|"$/g, '');
+  return o;
+}
+async function readTracks() {
+  const txt = await (await fetch(SRC)).text();
+  const lines = txt.split(/\r?\n/);
+  const audio = [], subs = [];
+  for (const ln of lines) {
+    if (!ln.startsWith('#EXT-X-MEDIA')) continue;
+    const a = parseAttr(ln);
+    if (a.TYPE === 'AUDIO') audio.push(a);
+    else if (a.TYPE === 'SUBTITLES') subs.push(a);
+  }
+  return { audio, subs };
+}
+function label(a) {
+  const ch = a.CHANNELS ? ` · ${a.CHANNELS}ch` : '';
+  const lang = a.LANGUAGE ? ` (${a.LANGUAGE})` : '';
+  const def = a.DEFAULT === 'YES' ? ' [默认]' : '';
+  return `${a.NAME}${lang}${ch}${def}`;
+}
+
+(async () => {
+  let tracks = { audio: [], subs: [] };
+  try { tracks = await readTracks(); }
+  catch (e) { fail('解析 master.m3u8 失败: ' + e); }
+
+  // 先按 master 里的顺序填充（保证下拉框一定有内容）
+  audioSel.innerHTML = '';
+  tracks.audio.forEach((a, i) => {
+    const o = document.createElement('option');
+    o.value = i; o.textContent = label(a);
+    audioSel.appendChild(o);
+  });
+  subsSel.innerHTML = '<option value="-1">关闭</option>';
+  tracks.subs.forEach((s, i) => {
+    const o = document.createElement('option');
+    o.value = i; o.textContent = label(s);
+    subsSel.appendChild(o);
+  });
+  const defAudio = tracks.audio.findIndex(a => a.DEFAULT === 'YES');
+  audioSel.selectedIndex = defAudio >= 0 ? defAudio : 0;
+
+  log(`master 解析：${tracks.audio.length} 音轨 / ${tracks.subs.length} 字幕`);
+
+  if (window.Hls && Hls.isSupported()) {
+    const hls = new Hls({ enableWorker: true });
+    hls.loadSource(SRC);
+    hls.attachMedia(v);
+
+    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      levelSel.innerHTML = '<option value="-1">Auto</option>';
+      hls.levels.forEach((l, i) => {
+        const o = document.createElement('option');
+        o.value = i; o.textContent = `${l.height}p · ${fmt(l.bitrate)}`;
+        levelSel.appendChild(o);
+      });
+      log(`hls.js 就绪：${hls.levels.length} 画质 / ${(hls.audioTracks||[]).length} 音轨 / ${(hls.subtitleTracks||[]).length} 字幕`);
+    });
+
+    levelSel.onchange = () => { hls.currentLevel = parseInt(levelSel.value, 10); };
+    audioSel.onchange = () => { hls.audioTrack = parseInt(audioSel.value, 10); };
+    subsSel.onchange = () => {
+      const i = parseInt(subsSel.value, 10);
+      hls.subtitleTrack = i;
+      hls.subtitleDisplay = i >= 0;
+    };
+
+    hls.on(Hls.Events.LEVEL_SWITCHED, (_, d) => {
+      const l = hls.levels[d.level];
+      if (l) log(`播放中：${l.height}p · ${fmt(l.bitrate)}`);
+    });
+    hls.on(Hls.Events.ERROR, (_, d) => { if (d.fatal) fail(`[FATAL] ${d.type} / ${d.details}`); });
+
+  } else if (v.canPlayType('application/vnd.apple.mpegurl')) {
+    // Safari 原生 HLS：用 video 元素自身的轨道列表
+    v.src = SRC;
+    const bind = () => {
+      if (v.audioTracks && v.audioTracks.length) {
+        audioSel.innerHTML = '';
+        for (let i = 0; i < v.audioTracks.length; i++) {
+          const t = v.audioTracks[i];
+          const o = document.createElement('option');
+          o.value = i; o.textContent = t.label || t.language || `音轨 ${i + 1}`;
+          audioSel.appendChild(o);
+          t.enabled = (i === 0);
+        }
+      }
+      if (v.textTracks) {
+        subsSel.innerHTML = '<option value="-1">关闭</option>';
+        for (let i = 0; i < v.textTracks.length; i++) {
+          const t = v.textTracks[i];
+          t.mode = 'hidden';
+          const o = document.createElement('option');
+          o.value = i; o.textContent = t.label || t.language || `字幕 ${i + 1}`;
+          subsSel.appendChild(o);
+        }
+      }
+      log(`原生 HLS：音频 ${v.audioTracks ? v.audioTracks.length : '?'} / 字幕 ${v.textTracks ? v.textTracks.length : '?'}`);
+    };
+    v.addEventListener('loadedmetadata', bind);
+    audioSel.onchange = () => {
+      if (!v.audioTracks) return;
+      for (let i = 0; i < v.audioTracks.length; i++) v.audioTracks[i].enabled = (i === parseInt(audioSel.value, 10));
+    };
+    subsSel.onchange = () => {
+      if (!v.textTracks) return;
+      const i = parseInt(subsSel.value, 10);
+      for (let j = 0; j < v.textTracks.length; j++) v.textTracks[j].mode = (j === i ? 'showing' : 'disabled');
+    };
+
+  } else {
+    fail('当前浏览器既无 hls.js(MSE) 也无原生 HLS 支持');
+  }
+})();
+</script>
+</body>
+</html>
