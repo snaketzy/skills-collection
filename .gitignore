@@ -37,6 +37,7 @@ next-env.d.ts
 
 # 本地媒体素材（体积大，不入库）
 /warehouse/
+/output/
 
 # Mux / Cloudflare R2 凭证与运行日志（切勿提交）
 cloudflare.env
