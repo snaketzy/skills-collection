@@ -1,0 +1,15 @@
+# rclone 配置样例（复制为项目根的 rclone.conf）
+#
+# 关键点：
+#   provider = Other
+#   no_check_bucket = true
+#   endpoint 使用 S3 兼容端点 https://<ACCOUNT_ID>.r2.cloudflarestorage.com
+
+[r2]
+type = s3
+provider = Other
+access_key_id = <R2 Access Key ID>
+secret_access_key = <R2 Secret Access Key>
+endpoint = https://<CLOUDFLARE_ACCOUNT_ID>.r2.cloudflarestorage.com
+acl = private
+no_check_bucket = true

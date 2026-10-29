@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  macOS LaunchAgent 模板：每天 23:00 触发 Mux 从 R2 抓新文件，并把外挂音轨 / 字幕并入同一个 asset。
+  使用前替换下列占位符：
+    __PYTHON__       which python3 的绝对路径
+    __SKILL_DIR__    本 skill 目录绝对路径
+    __PROJECT_DIR__  目标项目根绝对路径
+    __HOME__         你的用户主目录
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.mux-r2.multiple-tracks.nightly-pull</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>__PYTHON__</string>
+        <string>-u</string>
+        <string>__SKILL_DIR__/scripts/mux_r2_multiple_tracks_nightly_pull.py</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>__PROJECT_DIR__</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>__HOME__/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <key>LANG</key>
+        <string>en_US.UTF-8</string>
+    </dict>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>23</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>__PROJECT_DIR__/logs/launchd.stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>__PROJECT_DIR__/logs/launchd.stderr.log</string>
+</dict>
+</plist>
