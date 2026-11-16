@@ -39,4 +39,9 @@ description: 做什么 + 何时触发（含触发词）+ 不用于什么。单�
 
 | skill | 说明 |
 |---|---|
+| [encode-video-to-hls-pipeline](.trae/skills/encode-video-to-hls-pipeline/SKILL.md) | 本地视频 → 多码率 / 多音轨 / 多字幕 HLS（ffmpeg 硬编 + shaka-packager 封装） |
+| [upload-HLS-to-R2-pipeline](.trae/skills/upload-HLS-to-R2-pipeline/SKILL.md) | 本地 HLS 目录 → Cloudflare R2，修正 WebVTT content-type 并返回在线 m3u8 |
+| [tencent-cloud-cdn](.trae/skills/tencent-cloud-cdn/SKILL.md) | 腾讯云 CDN 加速 Cloudflare R2 的 HLS 播放域名，含 423 回环 / 节点 / 缓存排错 |
 | [mux-r2-video-pipeline](.trae/skills/mux-r2-video-pipeline/SKILL.md) | 本地视频 → Cloudflare R2 → Mux Pull → HLS 的批量发布流水线（含脚本、配置模板、launchd 定时） |
+| [mux-r2-multiple-tracks-video-pipeline](.trae/skills/mux-r2-multiple-tracks-video-pipeline/SKILL.md) | 主视频 + 侧挂音轨/字幕 → R2 → Mux，合成单个含可切换轨道的资产 |
+| [r2-cf-stream-multiple-tracks-video-pipeline](.trae/skills/r2-cf-stream-multiple-tracks-video-pipeline/SKILL.md) | 主视频 + 侧挂音轨/字幕 → R2 → Cloudflare Stream，输出 HLS / iframe 播放 |
